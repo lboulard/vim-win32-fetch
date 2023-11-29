@@ -30,11 +30,14 @@ $(ETC_SYSTEMD)/vim-win32-nightly.timer: vim-win32-nightly.timer
 .PHONY: reload
 reload: .reloaded
 
-.SECONDARY: .need-reload
 .ONESHELL: .reloaded
 .reloaded: .need-reload
 	systemctl daemon-reload
 	touch $@
+# this recipe run when systemd install is nop
+.SILENT: .need-reload
+.need-reload:
+	@touch $@
 
 .PHONY: install-systemd
 .NOTPARALLEL: install-systemd
