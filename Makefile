@@ -85,4 +85,4 @@ uninstall-vim-win32:
 		$(VIM_WIN32_HOME)/next-build \
 		$(VIM_WIN32_HOME)/next-build-retry
 
-# vim:set noet sw=8 st=8 sts=8
+# vim:noet sw=8 st=8 sts=8
