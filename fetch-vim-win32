@@ -1,0 +1,20 @@
+#!/bin/sh
+
+set -eu
+
+tag="$1"
+now="$(date --rfc-3339=seconds)"
+printf "\n### %s\n" "$now"
+printf "Fetching Vim repository for tag %s\n" "$tag"
+cd "$HOME/vim-win32-build" || exit 1
+
+git -C vim fetch --tags
+git -C vim checkout "$tag"
+git add vim
+if test -n "$(git diff-index --name-only HEAD --)"; then
+  git commit -q -m "Vim update to $tag"
+  git tag "$tag"
+  git push --tags origin master
+else
+  printf "%s> No change detected\n" "$now"
+fi
