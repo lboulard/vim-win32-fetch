@@ -34,6 +34,7 @@ else
   next=$((now + IDLE - delta))
   # never run after 12:00 in Europe/Paris time zone
   if time_before 12:00 "$next"; then
+    next=$(TZ=Europe/Paris date --rfc-3339=seconds -d "@$next")
     echo too early, will retry at "$next"
     mkdir -p "${DEADLINE%/*}"
     echo "$next" >"$DEADLINE"
