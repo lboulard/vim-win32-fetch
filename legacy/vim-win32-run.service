@@ -1,0 +1,18 @@
+[Unit]
+Description=Monitor Vim project on GitHub
+Requires=networking.service
+Requires=local-fs.target
+#After=syslog.service
+After=networking.service
+After=local-fs.target
+StartLimitIntervalSec=1800
+StartLimitBurst=3
+
+[Service]
+Type=notify
+ExecStart=/home/vim-win32/vim-win32-run
+WorkingDirectory=/home/vim-win32
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,63 @@
+#!/bin/bash
+
+set -eu
+
+now="$(date --utc +%s)"
+export TZ='Europe/Paris'
+
+# Set 9 hours as IDLE time
+IDLE=$((9 * 60 * 60))
+
+# Force update
+FORCE="${FORCE:-0}"
+[[ "$FORCE" = "1" ]] && IDLE=0
+
+set_deadline() {
+  install -d "${DEADLINE_FILE%/*}"
+  printf "%d\n" "$1" >"$DEADLINE_FILE"
+}
+
+# Do not check before deadline
+DEADLINE_FILE="$HOME/.config/deadline"
+if [ -r "$DEADLINE_FILE" ] && [[ "${FORCE}" = "0" ]]; then
+  deadline="$(cat "$DEADLINE_FILE" 2>/dev/null || echo 0)"
+  if [[ $now -lt $deadline ]]; then
+    exit 0
+  fi
+fi
+
+printf "\n### %s\n" "$(date -d "@$now")"
+cd "$HOME/vim-win32-build" || exit 1
+
+git fetch origin --prune --prune-tags
+git pull -f --tags --ff-only
+("$HOME/.local/bin/vimbuild" || echo 0 failed "$(date -d "@$now")") | (
+  set -eu
+  read -t 15 -r delta tag updated
+  printf "Last tag %s at %s\n" "$tag" "$updated"
+  # Check Vim repository after IDLE time of inactivity
+  if [[ "$delta" -ge "$IDLE" ]]; then
+    # If an error occurs, retry in 5 minutes
+    set_deadline "$((now + 5 * 60))"
+
+    printf "Fetching Vim repository for tag %s\n" "$tag"
+    git -C vim fetch --tags
+    git -C vim checkout "$tag"
+    git add vim
+    if test -n "$(git diff-index --name-only HEAD --)"; then
+      git commit -q -m "Vim update to $tag"
+      git tag "$tag"
+      git push --tags origin master
+    else
+      printf "No change detected\n"
+    fi
+
+    # Check again after IDLE time is spent
+    set_deadline $((now + 1 + IDLE))
+  else
+    # Do not check before IDLE time is spent after last commit
+    deadline=$((now + 1 + IDLE - delta))
+    printf "# Too early, will check after %s\n" "$(date -d "@$deadline")"
+    set_deadline "$deadline"
+  fi
+)

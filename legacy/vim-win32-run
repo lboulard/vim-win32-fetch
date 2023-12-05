@@ -1,0 +1,63 @@
+#!/bin/bash
+
+set -eu
+
+notify() {
+  local status
+  status="$1"
+  shift
+  echo "$status"
+  if [ -n "${NOTIFY_SOCKET:-}" ]; then
+    systemd-notify --status="$status" "$@"
+  fi
+}
+
+notify "Started" --ready
+
+U="$(getent passwd vim-win32 | cut -d: -f6)"
+test -n "$U"
+DEADLINE_FILE="$U/.config/deadline"
+
+TZ="Europe/Paris"
+export TZ
+
+get_deadline() {
+  local deadline="$1"
+  deadline="$((deadline + 3600))"
+  if [ -r "$DEADLINE_FILE" ]; then
+    deadline="$(cat "$DEADLINE_FILE" 2>/dev/null || echo "$deadline")"
+  fi
+  echo "$deadline"
+}
+
+get_morning_deadline() {
+  local deadline
+  deadline="$(get_deadline "$1")"
+  timezone="$(date "-d@$deadline" +%z)"
+  offset=$((${timezone:1:2} * 60 + ${timezone:3:4}))
+  time=$(((deadline + offset * 60) % 86400))
+  # if in the localtime afternoon, wait until next day midnight
+  echo $((deadline + (time >= 43200 ? 86400 - time : 0)))
+}
+
+runs=0
+while [[ "$runs" -lt 3 ]]; do
+  now="$(date --utc +%s)"
+  deadline="$(get_morning_deadline "$now")"
+  if [[ $now -ge $deadline ]]; then
+    printf >&2 "**ERROR deadline already expired on %s\n" "$(date -d "@$deadline")"
+  fi
+  while [[ $now -lt $deadline ]]; do
+    notify "$(printf "Sleeping until %s" "$(date -d "@$deadline")")"
+    sleep $((deadline - now))
+    now="$(date --utc +%s)"
+    runs=0
+  done
+  runs=$((runs + 1))
+  notify "$(printf "Running at %s" "$(date -d "@$now")")"
+  runuser -l vim-win32 -c './update-vim-win32-build 2>&1 | tee -a vim-win32-build.log' | while read -r line; do
+    printf "%s> %s\n" "vim-win32" "$line"
+  done
+done
+notify "$(printf "Failed to sleep after %d runs" "$runs")" >&2
+exit 1
