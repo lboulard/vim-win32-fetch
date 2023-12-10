@@ -1,47 +1,130 @@
-#!/bin/bash
+#!/usr/bin/env ruby
+# frozen_string_literal: true
 
-set -eu
-set pipefail
+require 'date'
+require 'net/http'
+require 'open3'
+require 'rss'
 
-FETCH_BIN="${FETCH_BIN:-$HOME/fetch-vim-win32}"
-LOG_FILE="${LOG_FILE:-$HOME/vim-win32-build.log}"
+# apt install ruby-tzinfo
+require 'tzinfo'
 
-DEADLINE="${XDG_STATE_HOME:-$HOME/.local/state}/vim-win32-deadline"
+TIMEZONE = ENV['TIMEZONE'] || 'Europe/Paris'
+FETCH_BIN = ENV['FETCH_BIN'] || './fetch-vim-win32'
+LOG_FILE = ENV['LOG_FILE'] || 'vim-win32-build.log'
 
-# Set 9 hours as IDLE time after last commit
-IDLE=$((9 * 60 * 60))
+TIME_FORMAT = /^(\d{1,2}):(\d{1,2})$/
 
-now="$(date --utc +%s)"
-vimbuild() {
-  "$HOME/.local/bin/vimbuild" || echo 0 failed "$(date -d "@$now")"
-}
+# convert HH:MM into seconds
+def to_sec(time)
+  time.match(TIME_FORMAT) do |m|
+    hour = m[1].to_i
+    minute = m[2].to_i
+    60 * ((hour * 60) + minute) if minute < 60
+  end
+end
 
-# arguments: 12:00 epoch_utc
-time_before() {
-  local seconds
-  test -n "$1" && test -n "$2"
-  limit="$(date -d "1970-01-01 UTC $(TZ=Europe/Paris date +%T -d "$1")" +%s)"
-  since_midnight="$(date -d "1970-01-01 UTC $(TZ=Europe/Paris date +%T -d "@$2")" +%s)"
-  [[ "$since_midnight" -lt "$limit" ]]
-}
+IDLE = to_sec('9:00')
+LIMIT = to_sec('12:00')
 
-read -t 15 -r delta tag updated < <(vimbuild)
-printf "last tag %s at %s\n" "$tag" "$updated"
-if [[ "$delta" -ge "$IDLE" ]]; then
-  "$FETCH_BIN" "$tag" 2>&1 | tee -a "$LOG_FILE" |
-    while read -r line; do
-      printf "%s> %s\n" "vim-win32" "$line"
-    done
-else
-  # run again $IDLE time after latest commit
-  next=$((now + IDLE - delta))
-  # never run after 12:00 in Europe/Paris time zone
-  if time_before 12:00 "$next"; then
-    next=$(TZ=Europe/Paris date --rfc-3339=seconds -d "@$next")
-    echo too early, will retry at "$next"
-    mkdir -p "${DEADLINE%/*}"
-    echo "$next" >"$DEADLINE"
+########################################################
+
+TZ = TZInfo::Timezone.get(TIMEZONE)
+
+DAEMON = ARGV.include?('-d')
+
+Tag = Struct.new('Tag', :name, :updated)
+
+# Message log shall appear immediately
+$stdout.sync = true
+
+def log(message, tag: nil, time: nil)
+  if tag
+    # Display in time zone for log message
+    updated = TZ.to_local(tag.updated).to_datetime
+    puts "#{message}: last tag #{tag.name} at \"#{updated.rfc822}\""
+  elsif time
+    puts "#{message}: #{time.to_datetime.rfc822}"
   else
-    echo next try at midnight, too late at "$next"
-  fi
-fi
+    puts message.to_s
+  end
+end
+
+def fetch_vim_win32(tag)
+  File.open(LOG_FILE, 'a') do |out|
+    Open3.popen2e({ 'TZ' => TIMEZONE }, FETCH_BIN, tag) do |_i, oe, _t|
+      oe.each do |line|
+        log "vim-win32> #{line}"
+        out.puts line
+        out.flush
+      end
+    end
+  end
+end
+
+def last_tag
+  uri = URI('https://github.com/vim/vim/tags.atom')
+  res = Net::HTTP.get_response(uri)
+
+  if res.is_a?(Net::HTTPSuccess)
+    feed = RSS::Parser.parse(res.body)
+    last = feed.items.first
+    Tag.new(last.title.content, last.updated.content.to_time)
+  else
+    Tag.new('', Time.now)
+  end
+end
+
+def next_midnight(time)
+  TZ.local_to_utc(time.to_date.next_day.to_time).to_time
+end
+
+def update(time)
+  tag = last_tag
+  # Wait IDLE delay after last commit
+  deadline = tag.updated + IDLE
+
+  if time >= deadline
+    log('can update', tag:)
+    fetch_vim_win32 tag.name
+    next_midnight(time) if DAEMON
+  else
+    log('too early', tag:)
+    deadline
+  end
+end
+
+# number of seconds since midnight
+def seconds_since_midnight(time)
+  midnight = TZ.local_to_utc(time.to_date.to_time)
+  TZ.local_to_utc(time) - midnight
+end
+
+def run
+  now = TZ.now
+  if seconds_since_midnight(now) < LIMIT
+    # only run in 00:00 - 12:00 interval
+    update(now.to_time)
+  elsif DAEMON
+    next_midnight(now)
+  else
+    log('outside of build time interval')
+  end
+end
+
+log 'starting in daemon mode' if DAEMON
+
+deadline = nil
+loop do
+  if deadline
+    log('sleep until', time: TZ.to_local(deadline))
+    delay = deadline - Time.now.to_time
+    sleep(delay)
+  end
+
+  now = TZ.now
+  log('now', time: now)
+
+  deadline = run
+  break unless deadline
+end

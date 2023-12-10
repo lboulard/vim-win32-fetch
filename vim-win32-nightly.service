@@ -5,5 +5,5 @@ Description="Update vim-win32 for next build"
 User=vim-win32
 Group=vim-win32
 ExecStart=@@SERVICE_BIN@@
-ExecStart=+@@RETRY_BIN@@
+WorkingDirectory=~
 Type=oneshot

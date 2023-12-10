@@ -4,12 +4,11 @@ VIM_WIN32_USER ?= vim-win32
 VIM_WIN32_GROUP ?= vim-win32
 VIM_WIN32_HOME ?= $(shell getent passwd $(VIM_WIN32_USER) | cut -d: -f6)
 
-FETCH_SERVICE = vim-win32-fetch
+FETCH_SERVICE = vim-win32-nightly
 TIMER_SERVICE = vim-win32-nightly
 
 FETCH_BIN = $(VIM_WIN32_HOME)/fetch-vim-win32
 SERVICE_BIN = $(VIM_WIN32_HOME)/next-build
-RETRY_BIN = $(VIM_WIN32_HOME)/next-build-retry
 LOG_FILE = vim-win32-build.log
 
 .DEFAULT: help
@@ -32,11 +31,8 @@ endef
 .build:
 	@mkdir $@
 
-.build/$(FETCH_SERVICE).service: vim-win32-fetch.service | .build
-	sed \
-	 -e 's#@@RETRY_BIN@@#$(RETRY_BIN)#' \
-	 -e 's#@@SERVICE_BIN@@#$(SERVICE_BIN)#' \
-	 $< >"$@.tmp"; \
+.build/$(FETCH_SERVICE).service: vim-win32-nightly.service | .build
+	sed -e 's#@@SERVICE_BIN@@#$(SERVICE_BIN)#' $< >"$@.tmp"; \
 	mv -f "$@.tmp" "$@"
 
 $(ETC_SYSTEMD)/$(FETCH_SERVICE).service: .build/$(FETCH_SERVICE).service
@@ -58,7 +54,7 @@ $(ETC_SYSTEMD)/$(TIMER_SERVICE).timer: .build/$(TIMER_SERVICE).timer
         } >"$@"
 
 .build/$(FETCH_SERVICE).overrides.conf: .build/$(FETCH_SERVICE).overrides.conf.static | .build
-	if ! cmp -s "$<" "$@"; then mv -vf "$<" "$@"; fi
+	@if ! cmp -s "$<" "$@"; then mv -vf "$<" "$@"; fi
 
 $(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d:
 	@mkdir "$@"
@@ -70,7 +66,12 @@ $(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d/overrides.conf: .build/$(FETCH_SERVICE
 reload: .reloaded
 
 .reloaded: .no-reload .need-reload
-	test -r .no-reload || systemctl daemon-reload
+	@if test -r .no-reload; then \
+	  echo "systemd units: no change";\
+	else \
+	  echo "system daemon-reload";\
+	  systemctl daemon-reload; \
+	fi
 	@$(RM) ".need-reload"
 	@touch $@
 # this recipe run when systemd install is nop
@@ -120,15 +121,12 @@ $(FETCH_BIN): fetch-vim-win32
 $(SERVICE_BIN): next-build
 	$(INSTALL_IN_VIM_WIN32)
 
-$(RETRY_BIN): next-build-retry
-	$(INSTALL_IN_VIM_WIN32)
-
 .PHONY: install-vim-win32
-install-vim-win32: $(FETCH_BIN) $(SERVICE_BIN) $(RETRY_BIN)
+install-vim-win32: $(FETCH_BIN) $(SERVICE_BIN)
 
 .PHONY: uninstall-vim-win32
 uninstall-vim-win32:
-	$(RM) $(FETCH_BIN) $(SERVICE_BIN) $(RETRY_BIN)
+	$(RM) $(FETCH_BIN) $(SERVICE_BIN)
 
 .ONESHELL: status
 .PHONY: status
