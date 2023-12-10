@@ -3,6 +3,9 @@
 set -eu
 set pipefail
 
+FETCH_BIN="${FETCH_BIN:-$HOME/fetch-vim-win32}"
+LOG_FILE="${LOG_FILE:-$HOME/vim-win32-build.log}"
+
 DEADLINE="${XDG_STATE_HOME:-$HOME/.local/state}/vim-win32-deadline"
 
 # Set 9 hours as IDLE time after last commit
@@ -25,7 +28,7 @@ time_before() {
 read -t 15 -r delta tag updated < <(vimbuild)
 printf "last tag %s at %s\n" "$tag" "$updated"
 if [[ "$delta" -ge "$IDLE" ]]; then
-  "$HOME/fetch-vim-win32" "$tag" 2>&1 | tee -a "$HOME/vim-win32-build.log" |
+  "$FETCH_BIN" "$tag" 2>&1 | tee -a "$LOG_FILE" |
     while read -r line; do
       printf "%s> %s\n" "vim-win32" "$line"
     done

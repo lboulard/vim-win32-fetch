@@ -4,6 +4,6 @@ Description="Update vim-win32 for next build"
 [Service]
 User=vim-win32
 Group=vim-win32
-ExecStart=/home/vim-win32/next-build
-ExecStart=+/home/vim-win32/next-build-retry
+ExecStart=@@SERVICE_BIN@@
+ExecStart=+@@RETRY_BIN@@
 Type=oneshot

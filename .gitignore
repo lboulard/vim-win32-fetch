@@ -4,6 +4,7 @@
 *.sw[a-z]
 \#*\#
 
+/.build
 /.need-reload
 /.reloaded
 /.no-reload

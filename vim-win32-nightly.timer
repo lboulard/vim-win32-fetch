@@ -3,7 +3,7 @@ Description="Run vim-win32-fetch.service"
 
 [Timer]
 OnCalendar=daily Europe/Paris
-Unit=vim-win32-fetch.service
+Unit=@@SERVICE_UNIT@@.service
 AccuracySec=1s
 
 [Install]
