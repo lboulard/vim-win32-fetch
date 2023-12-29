@@ -5,9 +5,13 @@ set -eu
 tag="$1"
 now="$(date --rfc-3339=seconds)"
 printf "\n### %s\n" "$now"
-printf "Fetching Vim repository for tag %s\n" "$tag"
 cd "$HOME/vim-win32-build" || exit 1
 
+echo "Update ourself before continuing"
+git pull origin master
+git fetch --tags
+
+printf "Fetching Vim repository for tag %s\n" "$tag"
 git -C vim fetch --tags
 git -C vim checkout "$tag"
 git add vim
