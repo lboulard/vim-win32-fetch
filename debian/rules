@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with sysuser
+
+# use prepared systemd files in debian/
+override_dh_auto_build:
+
+override_dh_auto_install:
+	make install-bin DESTDIR=debian/vim-win32-nightly PREFIX=/opt ETCDIR=/etc
+
+override_dh_installsystemd:
+	dh_installsystemd vim-win32-nightly.service --no-start
+	dh_installsystemd vim-win32-nightly.timer

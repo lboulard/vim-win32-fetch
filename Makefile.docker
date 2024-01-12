@@ -1,0 +1,43 @@
+
+USER_ID = $(shell id -u)
+GROUP_ID = $(shell id -g)
+
+PKGDIR = $(shell pwd)/pkg
+
+ifeq ($(shell test -f .env && echo 1),1)
+ENVFILE = .env
+endif
+ifneq ($(ENVFILE),)
+DOCKER_ENV = --env-file="$(ENVFILE)"
+endif
+DOCKER_ARGS = $(DOCKER_ENV) -e "TERM=$$TERM"
+
+.PHONY: build
+build: build-image
+	@mkdir -p $(PKGDIR)
+	docker run --rm -it -v $$(pwd):/build/src \
+	  -v "$(PKGDIR):/pkg" $(DOCKER_ARGS) \
+	  vim-win32-dpkg \
+	  sh -c 'dpkg-buildpackage --build=all -us -uc && /opt/bin/copy-files /build /pkg'
+
+.PHONY: shell
+shell: build-image
+	@mkdir -p $(PKGDIR)
+	docker run --rm -it -v $$(pwd):/build/src \
+	  -v "$(PKGDIR):/pkg" $(DOCKER_ARGS) \
+	  vim-win32-dpkg
+
+.PHONY: root
+root: build-image
+	@mkdir -p $(PKGDIR)
+	docker run --rm -it -v $$(pwd):/build/src \
+	  -v "$(PKGDIR):/pkg" $(DOCKER_ARGS) \
+	  -u root \
+	  vim-win32-dpkg
+
+.PHONY: build-image
+build-image:
+	docker build -f Dockerfile.debian12 \
+	  --build-arg "USER_ID=$(USER_ID)" \
+	  --build-arg "GROUP_ID=$(GROUP_ID)" \
+	  -t vim-win32-dpkg .

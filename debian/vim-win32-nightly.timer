@@ -1,0 +1,10 @@
+[Unit]
+Description="Run vim-win32-fetch.service"
+
+[Timer]
+OnCalendar=daily Europe/Paris
+Unit=vim-win32-nightly.service
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

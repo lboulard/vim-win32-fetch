@@ -68,3 +68,53 @@ To remove, use
 ```shell
 make uninstall-acting PREFIX=/home/vim-win32 ETCDIR=/etc BINDIR=/home/vim-win32
 ```
+
+## Build Debian package using docker
+
+```shell
+make -f Makefile.docker build
+```
+
+Create a `.env` file or add `ENVFILE=../vim-win32-fetch.env` to define a custom
+environment files containing `DEBFULLNAME` and `DEBEMAIL` variables.
+
+### Configuration
+
+Once package is installed, a `/var/lib/vim-win32/.gitconfig` file shall be
+created. Mininal configuration is:
+
+```gitconfig
+[user]
+        name = Laurent Boulard
+        email = laurent.boulard@gmail.com
+[push]
+        default = simple
+```
+
+#### Fetch project in vim-win32 user home
+
+When using SSH, ensure that `~/.ssh/id_ecdsa` and `~/.ssh/id_ecdsa.pub` (or
+equivalent RSA, ED25519 keys) are accessible and no passphrase for secret key.
+Folder `~/.ssh` shall have `0700` access (`chmod 0700 ~/.ssh`)
+
+Login in `vim-win32` and run git command:
+
+```
+su -l vim-win32 -s /bin/bash
+git clone git@github.com:lboulard/vim-win32-build.git
+exit
+```
+
+When using HTTPS, use an dedicated application key token. Token can be obtained
+using GitHub web site in settings section.
+
+Login in `vim-win32` and run git command:
+
+```
+su -l vim-win32 -s /bin/bash
+git clone https://github.com/lboulard/vim-win32-build.git
+exit
+```
+
+To test run `systemctl start vim-win32-nightly.service`. Verify results with
+`journal -eu vim-win32-nightly.service`.

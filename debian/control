@@ -1,0 +1,14 @@
+Source: vim-win32-fetch
+Section: admin
+Priority: optional
+Maintainer: Laurent Boulard <laurent.boulard@gmail.com>
+Build-Depends: debhelper-compat (= 13), dh-sysuser (<< 1.4)
+Standards-Version: 4.5.1
+Rules-Requires-Root: no
+
+Package: vim-win32-nightly
+Architecture: all
+Depends: ruby, ruby-tzinfo, ${misc:Depends}
+Description:
+ Script to update vim-win32-build repository when
+ project vim release a new tag.

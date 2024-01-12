@@ -15,3 +15,17 @@
 /*.overrides.conf
 !/*.tmpl.service
 !/*.tmpl.timer
+
+/build
+/pkg
+/debian/*
+!/debian/source/*
+!/debian/changelog
+!/debian/control
+!/debian/rules
+!/debian/*.config
+!/debian/*.scripts
+!/debian/*.service
+!/debian/*.sysuser
+!/debian/*.templates
+!/debian/*.timer

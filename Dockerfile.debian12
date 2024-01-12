@@ -1,0 +1,63 @@
+FROM debian:bookworm
+
+RUN set -ex \
+    && sed -i -- 's/Types: deb/Types: deb deb-src/g' /etc/apt/sources.list.d/debian.sources \
+    && DEBIAN_FRONTEND=noninteractive \
+        apt-get update \
+    && DEBIAN_FRONTEND=noninteractive \
+        apt-get install -y --no-install-recommends \
+            bat \
+            build-essential \
+            curl \
+            cdbs \
+            cmake \
+            devscripts \
+            dh-sysuser \
+            equivs \
+            fakeroot \
+            fd-find \
+            git-buildpackage \
+            git \
+            lintian \
+            make \
+            man \
+            manpages-dev \
+            ncurses-term \
+            openssh-client \
+            pristine-tar \
+            procps \
+            ripgrep \
+            vim-nox \
+            wget \
+            zsh \
+    && apt-get clean \
+    && update-alternatives --set vim /usr/bin/vim.nox \
+    && rm -rf /tmp/* /var/tmp/*
+
+ARG USER_ID
+ARG GROUP_ID
+
+RUN set -ex \
+    && groupadd -g "$GROUP_ID" build-ci \
+    && useradd -l -u "$USER_ID" -g build-ci build-ci \
+    && install -d -m 0750 -o "$USER_ID" -g "$GROUP_ID" /build \
+    && install -d -m 0750 -o "$USER_ID" -g "$GROUP_ID" /build/src
+
+# Helpers to copy final packages
+RUN mkdir -p /opt/bin; \
+    { \
+    echo "#!/bin/sh"; \
+    echo 'find $1 -maxdepth 1 -name src -prune -o -type f -exec cp -av {} $2 \;'; \
+    } >/opt/bin/copy-files; \
+    chmod +x /opt/bin/copy-files
+
+WORKDIR /build/src
+
+ENV EDITOR=vim
+ENV VISUAL=vim
+
+USER build-ci
+VOLUME /build
+VOLUME /pkg
+
+CMD ["/bin/zsh", "-l", "-i"]
