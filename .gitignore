@@ -8,3 +8,10 @@
 /.need-reload
 /.reloaded
 /.no-reload
+/.env
+
+/*.service
+/*.timer
+/*.overrides.conf
+!/*.tmpl.service
+!/*.tmpl.timer

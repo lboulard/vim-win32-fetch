@@ -3,7 +3,7 @@
 Every midnight in Europe/Paris time zone, Vim project is checked for latest
 tag. If tag was made at least 9 hours, new build is started if tag is not
 yet in vim-win32-build project. Else, a new check is made 9 hours after
-last tag date time. 
+last tag date time.
 
 This small project contains systemd files and script to realize this
 operation.
@@ -11,7 +11,7 @@ operation.
 ### Prerequisites
 
 - Systemd
-- User and group `vim-win32` to run service (and requires home folder)
+- User and group `vim-win32` to run service (and required home folder)
 - GNU Makefile
 - Python 3 to run `vimbuild`
 - `vimbuild` installed at `$HOME/.local/bin/vimbuild`
@@ -21,9 +21,12 @@ Program `vimbuild` will fetch latest tag metadata of project
 
 ### Usage
 
-Default `make` is to show small help. Use `install` and `uninstall` to manage
-project files on host. Use commodity command `make reload` to run `systemctl
-daemon-reload`.
+Default `make` will create service and timer systemd files. Use `install` and
+`uninstall` to manage project files on host. Use commodity command `make
+reload` to run `systemctl daemon-reload`.
+
+Default is too run inside `/var/lib/vim-win32` folder.
+Log can be found in `/var/log/vim-win32-fetch.log`.
 
 #### Install files
 
@@ -43,6 +46,27 @@ You can do it manually with
 
 Run `systemctl status vim-win32-nightly.timer` to verify timer state.
 
-Run 
+Run
 `journalctl -n 30 -u vim-win32-nightly.timer -u vim-win32-fetch.service`
 to verify timer and service results.
+
+## Install directly in `vim-win32` home folder
+
+Use this command to install and run directly in home folder of `win32-user`
+user.
+
+```shell
+make install-acting PREFIX=/home/vim-win32 ETCDIR=/etc BINDIR=/home/vim-win32 WORKDIR=\~ LOGDIR=.
+```
+
+Installation will try to reload systemd is needed. See "Install Files" section
+to enable and start timer. Log will at home folder root. Work folder will be
+home folder itself.
+
+Use `ACTING_USER` and `ACTING_GROUP` to change default user for service.
+
+To remove, use
+
+```shell
+make uninstall-acting PREFIX=/home/vim-win32 ETCDIR=/etc BINDIR=/home/vim-win32
+```

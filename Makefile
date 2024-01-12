@@ -1,76 +1,91 @@
 
-ETC_SYSTEMD ?= /etc/systemd/system
-VIM_WIN32_USER ?= vim-win32
-VIM_WIN32_GROUP ?= vim-win32
-VIM_WIN32_HOME ?= $(shell getent passwd $(VIM_WIN32_USER) | cut -d: -f6)
+# User for systemd sercice overrides
+ACTING_USER = vim-win32
+ACTING_GROUP = vim-win32
+
+FETCH_BIN = fetch-vim-win32
+SERVICE_BIN = next-build
 
 FETCH_SERVICE = vim-win32-nightly
 TIMER_SERVICE = vim-win32-nightly
 
-FETCH_BIN = $(VIM_WIN32_HOME)/fetch-vim-win32
-SERVICE_BIN = $(VIM_WIN32_HOME)/next-build
+SYSTEMD_FILES = $(FETCH_SERVICE).service $(TIMER_SERVICE).timer
+SYSTEMD_OVERRIDES = $(FETCH_SERVICE).overrides.conf
+
+SRCDIR = .
+DESTDIR =
+PREFIX = /usr/local
+BINDIR = $(PREFIX)/bin
+LOGDIR = /var/log
+WORKDIR = /var/lib/vim-win32
+
+ifeq ($(PREFIX),/usr)
+ETCDIR = /etc
+else ifeq ($(PREFIX),/usr/local)
+ETCDIR = /etc
+else
+ETCDIR= $(PREFIX)/etc
+endif
+
+ETC_SYSTEMD = $(ETCDIR)/systemd/system
 LOG_FILE = vim-win32-build.log
 
-.DEFAULT: help
-.PHONY: help
-help:
-	@echo "'make install' to install all files"; \
-	echo "'make uninstall' to uninstall all files"; \
-	false
+all: bin etc-systemd
 
-.NOTPARALLEL: install
-install: install-vim-win32 install-systemd
+# build section
 
-uninstall: uninstall-systemd uninstall-vim-win32
-
-define INSTALL_IN_ETC_SYSTEMD
-install -o root -g root -m 0644 $< $@
-@touch .need-reload; $(RM) .no-reload
-endef
+.PHONY: bin
+bin: # nothing
 
 .build:
 	@mkdir $@
 
-.build/$(FETCH_SERVICE).service: vim-win32-nightly.service | .build
-	sed -e 's#@@SERVICE_BIN@@#$(SERVICE_BIN)#' $< >"$@.tmp"; \
-	mv -f "$@.tmp" "$@"
+.PHONY: .build/$(FETCH_SERVICE).service
+.build/$(FETCH_SERVICE).service: $(SRCDIR)/vim-win32-nightly.tmpl.service | .build
+	sed \
+	  -e 's#@@SERVICE_BIN@@#$(BINDIR)/$(SERVICE_BIN)#' \
+	  -e 's#@@FETCH_BIN@@#$(BINDIR)/$(FETCH_BIN)#' \
+	  -e 's#@@LOG_FILE@@#$(LOGDIR)/$(LOG_FILE)#' \
+	  -e 's#@@WORKDIR@@#$(WORKDIR)#' \
+	  $< >$@
 
-$(ETC_SYSTEMD)/$(FETCH_SERVICE).service: .build/$(FETCH_SERVICE).service
-	$(INSTALL_IN_ETC_SYSTEMD)
+$(FETCH_SERVICE).service: .build/$(FETCH_SERVICE).service
+	@if ! cmp -s "$<" "$@"; then mv -vf "$<" "$@"; fi
 
-.build/$(TIMER_SERVICE).timer: vim-win32-nightly.timer | .build
-	sed -e 's/@@SERVICE_UNIT@@/$(FETCH_SERVICE)/' $< >"$@.tmp"; \
-	mv -f "$@.tmp" "$@"
+.PHONY: .build/$(TIMER_SERVICE).timer
+.build/$(TIMER_SERVICE).timer: $(SRCDIR)/vim-win32-nightly.tmpl.timer | .build
+	sed -e 's/@@SERVICE_UNIT@@/$(FETCH_SERVICE)/' $< >$@
 
-$(ETC_SYSTEMD)/$(TIMER_SERVICE).timer: .build/$(TIMER_SERVICE).timer
-	$(INSTALL_IN_ETC_SYSTEMD)
+$(TIMER_SERVICE).timer: .build/$(TIMER_SERVICE).timer
+	@if ! cmp -s "$<" "$@"; then mv -vf "$<" "$@"; fi
 
 .PHONY: .build/$(FETCH_SERVICE).overrides.conf.static
 .build/$(FETCH_SERVICE).overrides.conf.static: | .build
 	@{ \
 	  echo "[Service]"; \
-	  echo "Environment=FETCH_BIN=$(FETCH_BIN)"; \
-	  echo "Environment=LOG_FILE=$(LOG_FILE)"; \
-        } >"$@"
+	  echo "User=$(ACTING_USER)"; \
+	  echo "Group=$(ACTING_GROUP)"; \
+	} >"$@"
 
-.build/$(FETCH_SERVICE).overrides.conf: .build/$(FETCH_SERVICE).overrides.conf.static | .build
+$(FETCH_SERVICE).overrides.conf: .build/$(FETCH_SERVICE).overrides.conf.static
 	@if ! cmp -s "$<" "$@"; then mv -vf "$<" "$@"; fi
 
-$(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d:
-	@mkdir "$@"
+etc-systemd: $(SYSTEMD_FILES)
+etc-systemd-overrides: $(SYSTEMD_OVERRIDES)
 
-$(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d/overrides.conf: .build/$(FETCH_SERVICE).overrides.conf | $(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d
-	$(INSTALL_IN_ETC_SYSTEMD)
+# system-reload when needed
 
 .PHONY: reload
 reload: .reloaded
 
 .reloaded: .no-reload .need-reload
-	@if test -r .no-reload; then \
-	  echo "systemd units: no change";\
-	else \
-	  echo "system daemon-reload";\
-	  systemctl daemon-reload; \
+	@if [ "$(ETC_SYSTEMD)" = "/etc/systemd/system" ]; then \
+	  if test -r .no-reload; then \
+	    echo "systemd units: no change";\
+	  else \
+	    echo "system daemon-reload";\
+	    systemctl daemon-reload; \
+	  fi \
 	fi
 	@$(RM) ".need-reload"
 	@touch $@
@@ -84,49 +99,74 @@ reload: .reloaded
 .no-reload:
 	@test -r .need-reload || touch $@
 
+# install section
+
+define INSTALL_IN_ETC_SYSTEMD
+@if ! cmp -s "$1" "$2"; then touch .need-reload; $(RM) .no-reload; fi
+install -C -m 0644 $1 $2
+endef
+
 .PHONY: install-systemd
-.NOTPARALLEL: install-systemd
-install-systemd: install-systemd-files install-systemd-overrides reload
-
-.PHONY: install-systemd-files
-install-systemd-files: \
- $(ETC_SYSTEMD)/$(FETCH_SERVICE).service \
- $(ETC_SYSTEMD)/$(TIMER_SERVICE).timer
-
-.PHONY: install-systemd-overrides
-install-systemd-overrides: \
- $(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d/overrides.conf
+install-systemd: etc-systemd
+	install -m 0755 -d $(DESTDIR)$(ETC_SYSTEMD)
+	$(call INSTALL_IN_ETC_SYSTEMD,$(FETCH_SERVICE).service,$(DESTDIR)$(ETC_SYSTEMD)/$(FETCH_SERVICE).service)
+	$(call INSTALL_IN_ETC_SYSTEMD,$(TIMER_SERVICE).timer,$(DESTDIR)$(ETC_SYSTEMD)/$(TIMER_SERVICE).timer)
 
 .PHONY: uninstall-systemd
 uninstall-systemd:
-	if [ "$(ETC_SYSTEMD)" = "/etc/systemd/system" ]; then \
-		if test -r "$(ETC_SYSTEMD)/$(TIMER_SERVICE).timer"; then \
+	if [ "$(DESTDIR)$(ETC_SYSTEMD)" = "/etc/systemd/system" ]; then \
+		if test -r "$(DESTDIR)$(ETC_SYSTEMD)/$(TIMER_SERVICE).timer"; then \
 			systemctl disable "$(TIMER_SERVICE).timer"; \
 			systemctl stop "$(TIMER_SERVICE).timer"; \
 		fi; \
 	fi
-	$(RM) $(ETC_SYSTEMD)/$(FETCH_SERVICE).service \
-		 $(ETC_SYSTEMD)/$(TIMER_SERVICE).timer \
-		 $(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d/overrides.conf
-	rmdir $(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d
+	$(RM) $(DESTDIR)$(ETC_SYSTEMD)/$(FETCH_SERVICE).service \
+		 $(DESTDIR)$(ETC_SYSTEMD)/$(TIMER_SERVICE).timer \
+		 $(DESTDIR)$(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d/overrides.conf
+	rmdir $(DESTDIR)$(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d
 	systemctl daemon-reload
 
-define INSTALL_IN_VIM_WIN32
-install -o "$(VIM_WIN32_USER)" -g "$(VIM_WIN32_GROUP)" -m 0755 $< $@
-endef
+.PHONY: install-bin
+install-bin: bin
+	install -m 0755 -d $(DESTDIR)$(BINDIR)
+	install -m 0755 $(SRCDIR)/$(FETCH_BIN) $(DESTDIR)$(BINDIR)/$(FETCH_BIN)
+	install -m 0755 $(SRCDIR)/$(SERVICE_BIN) $(DESTDIR)$(BINDIR)/$(SERVICE_BIN)
 
-$(FETCH_BIN): fetch-vim-win32
-	$(INSTALL_IN_VIM_WIN32)
+.PHONY: install-acting-bin
+install-acting-bin: bin
+	install -o "$(ACTING_USER)" -g "$(ACTING_GROUP)" -m 0755 -d $(DESTDIR)$(BINDIR)
+	install -C -o "$(ACTING_USER)" -g "$(ACTING_GROUP)" -m 0755 $(SRCDIR)/$(FETCH_BIN) $(DESTDIR)$(BINDIR)/$(FETCH_BIN)
+	install -C -o "$(ACTING_USER)" -g "$(ACTING_GROUP)" -m 0755 $(SRCDIR)/$(SERVICE_BIN) $(DESTDIR)$(BINDIR)/$(SERVICE_BIN)
 
-$(SERVICE_BIN): next-build
-	$(INSTALL_IN_VIM_WIN32)
+.PHONY: install-acting-systemd
+install-acting-systemd: etc-systemd-overrides
+	install -m 0755 -d $(DESTDIR)$(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d
+	$(call INSTALL_IN_ETC_SYSTEMD,$(FETCH_SERVICE).overrides.conf,$(DESTDIR)$(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d/overrides.conf)
 
-.PHONY: install-vim-win32
-install-vim-win32: $(FETCH_BIN) $(SERVICE_BIN)
+.PHONY: uninstall-acting-systemd
+uninstall-acting-systemd:
+	$(RM) $(DESTDIR)$(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d/overrides.conf
+	rmdir $(DESTDIR)$(ETC_SYSTEMD)/$(FETCH_SERVICE).service.d || true
 
-.PHONY: uninstall-vim-win32
-uninstall-vim-win32:
-	$(RM) $(FETCH_BIN) $(SERVICE_BIN)
+.PHONY: uninstall-bin
+uninstall-bin:
+	$(RM) $(DESTDIR)$(BINDIR)/$(FETCH_BIN) $(DESTDIR)$(BINDIR)/$(SERVICE_BIN)
+
+.NOTPARALLEL: install
+install: install-bin install-systemd
+
+.PHONY: install-acting
+.NOTPARALLEL: install-acting
+install-acting: install-acting-bin install-systemd install-acting-systemd reload
+
+.PHONY: uninstall
+uninstall: uninstall-systemd uninstall-bin
+
+.PHONY: uninstall-acting
+.NOTPARALLEL: uninstall-acting
+uninstall-acting: uninstall-acting-systemd uninstall reload
+
+# miscellaneous section
 
 .ONESHELL: status
 .PHONY: status
