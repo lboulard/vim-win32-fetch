@@ -41,7 +41,7 @@ bin: # nothing
 	@mkdir $@
 
 .PHONY: .build/$(FETCH_SERVICE).service
-.build/$(FETCH_SERVICE).service: $(SRCDIR)/vim-win32-nightly.tmpl.service | .build
+.build/$(FETCH_SERVICE).service: $(SRCDIR)/systemd/vim-win32-nightly.tmpl.service | .build
 	sed \
 	  -e 's#@@SERVICE_BIN@@#$(BINDIR)/$(SERVICE_BIN)#' \
 	  -e 's#@@FETCH_BIN@@#$(BINDIR)/$(FETCH_BIN)#' \
@@ -53,7 +53,7 @@ $(FETCH_SERVICE).service: .build/$(FETCH_SERVICE).service
 	@if ! cmp -s "$<" "$@"; then mv -vf "$<" "$@"; fi
 
 .PHONY: .build/$(TIMER_SERVICE).timer
-.build/$(TIMER_SERVICE).timer: $(SRCDIR)/vim-win32-nightly.tmpl.timer | .build
+.build/$(TIMER_SERVICE).timer: $(SRCDIR)/systemd/vim-win32-nightly.tmpl.timer | .build
 	sed -e 's/@@SERVICE_UNIT@@/$(FETCH_SERVICE)/' $< >$@
 
 $(TIMER_SERVICE).timer: .build/$(TIMER_SERVICE).timer
@@ -129,14 +129,14 @@ uninstall-systemd:
 .PHONY: install-bin
 install-bin: bin
 	install -m 0755 -d $(DESTDIR)$(BINDIR)
-	install -m 0755 $(SRCDIR)/$(FETCH_BIN) $(DESTDIR)$(BINDIR)/$(FETCH_BIN)
-	install -m 0755 $(SRCDIR)/$(SERVICE_BIN) $(DESTDIR)$(BINDIR)/$(SERVICE_BIN)
+	install -m 0755 $(SRCDIR)/scripts/$(FETCH_BIN) $(DESTDIR)$(BINDIR)/$(FETCH_BIN)
+	install -m 0755 $(SRCDIR)/scripts/$(SERVICE_BIN) $(DESTDIR)$(BINDIR)/$(SERVICE_BIN)
 
 .PHONY: install-acting-bin
 install-acting-bin: bin
 	install -o "$(ACTING_USER)" -g "$(ACTING_GROUP)" -m 0755 -d $(DESTDIR)$(BINDIR)
-	install -C -o "$(ACTING_USER)" -g "$(ACTING_GROUP)" -m 0755 $(SRCDIR)/$(FETCH_BIN) $(DESTDIR)$(BINDIR)/$(FETCH_BIN)
-	install -C -o "$(ACTING_USER)" -g "$(ACTING_GROUP)" -m 0755 $(SRCDIR)/$(SERVICE_BIN) $(DESTDIR)$(BINDIR)/$(SERVICE_BIN)
+	install -C -o "$(ACTING_USER)" -g "$(ACTING_GROUP)" -m 0755 $(SRCDIR)/scripts/$(FETCH_BIN) $(DESTDIR)$(BINDIR)/$(FETCH_BIN)
+	install -C -o "$(ACTING_USER)" -g "$(ACTING_GROUP)" -m 0755 $(SRCDIR)/scripts/$(SERVICE_BIN) $(DESTDIR)$(BINDIR)/$(SERVICE_BIN)
 
 .PHONY: install-acting-systemd
 install-acting-systemd: etc-systemd-overrides
