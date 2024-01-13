@@ -13,8 +13,6 @@ operation.
 - Systemd
 - User and group `vim-win32` to run service (and required home folder)
 - GNU Makefile
-- Python 3 to run `vimbuild`
-- `vimbuild` installed at `$HOME/.local/bin/vimbuild`
 
 Program `vimbuild` will fetch latest tag metadata of project
 <https://github.com/vim/vim>.
