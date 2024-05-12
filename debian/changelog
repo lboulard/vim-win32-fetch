@@ -1,3 +1,11 @@
+vim-win32-fetch (1.1) stable; urgency=medium
+
+  * Limit of 12h (midday) to start a build is not respected.
+  * Reduce time limit to 5h after last commit to accommodate new maintainers
+    work times.
+
+ -- Laurent Boulard <laurent.boulard@gmail.com>  Sun, 12 May 2024 16:08:28 +0000
+
 vim-win32-fetch (1.0) stable; urgency=medium
 
   * Initial release of ppackage.
