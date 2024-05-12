@@ -102,7 +102,7 @@ end
 
 def run
   now = TZ.now
-  if seconds_since_midnight(now) < LIMIT
+  if seconds_since_midnight(now + IDLE) < LIMIT
     # only run in 00:00 - 12:00 interval
     update(now.to_time)
   elsif DAEMON
