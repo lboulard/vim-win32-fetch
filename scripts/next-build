@@ -24,7 +24,7 @@ def to_sec(time)
   end
 end
 
-IDLE = to_sec('9:00')
+IDLE = to_sec('5:00')
 LIMIT = to_sec('12:00')
 
 ########################################################
