@@ -9,10 +9,10 @@ cd "$HOME/vim-win32-build" || exit 1
 
 echo "Update ourself before continuing"
 git pull origin master
-git fetch --tags
+git fetch --tags --prune-tags
 
 printf "Fetching Vim repository for tag %s\n" "$tag"
-git -C vim fetch --tags
+git -C vim fetch --tags --prune-tags
 git -C vim checkout "$tag"
 git add vim
 if test -n "$(git diff-index --name-only HEAD --)"; then
