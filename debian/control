@@ -8,7 +8,7 @@ Rules-Requires-Root: no
 
 Package: vim-win32-nightly
 Architecture: all
-Depends: ruby, ruby-tzinfo, ${misc:Depends}
+Depends: ruby, ruby-tzinfo, git (>= 2.17.0), ${misc:Depends}
 Description:
  Script to update vim-win32-build repository when
  project vim release a new tag.
